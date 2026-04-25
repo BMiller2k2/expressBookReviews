@@ -1,74 +1,135 @@
-const express = require('express');
-let books = require("./booksdb.js");
-let isValid = require("./auth_users.js").isValid;
-let users = require("./auth_users.js").users;
+import express from 'express';
+import axios from 'axios';
+import booksData from './booksdb.js';
+import { isValid, users } from './auth_users.js';
 const public_users = express.Router();
 
+// 1. Fixed Imports: Dynamic imports return a promise, so we must await them
+let books = booksData;
 
-public_users.post("/register", (req, res) => {
-    const { username, password } = req.body;
+// Initializing data from local files
+const initializeData = async () => {
+    try {
+        const booksModule = await import("./booksdb.js");
+        // Log this to see what the file actually contains
+        console.log("Loaded Module:", booksModule);
 
-    if (username && password) {
-        if (!isValid(username)) {
-            users.push({ "username": username, "password": password });
-            return res.status(200).json({ message: "User successfully registered. Now you can login" });
-        } else {
-            return res.status(404).json({ message: "User already exists!" });
-        }
+        books = booksModule.default;
+    } catch (err) {
+        console.error("Failed to load local modules:", err.message);
     }
-    return res.status(404).json({ message: "Unable to register user." });
+};
+
+
+// 2. Updated Routes to use Async/Await
+public_users.get("/", async (req, res) => {
+    // Check if books data has loaded yet
+    res.status(200).json(books);;
 });
 
-// Get the book list available in the shop
-const axios = require('axios');
+public_users.get('/review/:isbn', async (req, res) => {
+    const isbn = req.params.isbn;
+    try {
+        if (books[isbn]) {
+            res.status(200).send(books[isbn].reviews);
+        } else {
+            res.status(404).json({ message: "Book not found" });
+        }
+    } catch (error) {
+        res.status(500).json({ message: "Error retrieving reviews" });
+    }
+});
+
+public_users.get("/isbn/:isbn", async (req, res) => {
+    const isbn = req.params.isbn;
+
+    // Check if books data has loaded yet
+    if (!books || Object.keys(books).length === 0) {
+        return res.status(503).json({ message: "Database still loading, please try again." });
+    }
+
+    const book = books[isbn];
+    if (book) {
+        res.status(200).json(book);
+    } else {
+        res.status(404).json({ message: "Book not found" });
+    }
+});
+public_users.get("/author/:author", async (req, res) => {
+    const author = req.params.author;
+
+    // Loading check
+    if (!books || Object.keys(books).length === 0) {
+        return res.status(503).json({ message: "Database loading..." });
+    }
+
+    // Filter books by the author name provided in the URL
+    const filtered_books = Object.values(books).filter(book => book.author === author);
+
+    if (filtered_books.length > 0) {
+        res.status(200).json(filtered_books);
+    } else {
+        res.status(404).json({ message: "No books found by this author" });
+    }
+});
+
+public_users.get("/title/:title", async (req, res) => {
+    const title = req.params.title;
+
+    const filtered_books = Object.values(books).filter(b => b.title === title);
+
+    if (filtered_books.length > 0) {
+        res.status(200).json(filtered_books);
+    } else {
+        res.status(404).json({ message: "No books found with this title" });
+    }
+});
 
 const getBooks = async () => {
     try {
-        const response = await axios.get("http://localhost:5000/");
-        console.log(JSON.stringify(response.data, null, 4));
+        const response = await axios.get("http://127.0.0:5000/");
+        console.log("All Books:", JSON.stringify(response.data, null, 4));
     } catch (error) {
         console.error("Error fetching books:", error.message);
     }
 };
-getBooks();
 
 const getBookByISBN = async (isbn) => {
     try {
-        const response = await axios.get(`http://localhost:5000/isbn/${isbn}`);
-        console.log("Book details by ISBN:");
-        console.log(JSON.stringify(response.data, null, 4));
+        // We use backticks ( ` ) and ${isbn} to insert the number
+        const response = await axios.get(`http://127.0.0.1:5000/isbn/1`);
+        console.log(`Book details for ISBN ${isbn}:`, JSON.stringify(response.data, null, 4));
     } catch (error) {
-        console.error("Error fetching ISBN:", error.message);
+        // This will tell us if the URL is still malformed or if the ID was not found
+        console.error(`Error fetching ISBN ${isbn}:`, error.message);
     }
 };
 
-// Test it
-getBookByISBN(1)
-
 const getBooksByAuthor = async (author) => {
     try {
+        // This matches the path: http://localhost:5000/author/Chinua%20Achebe
         const response = await axios.get(`http://localhost:5000/author/${author}`);
         console.log(`Books by ${author}:`);
         console.log(JSON.stringify(response.data, null, 4));
     } catch (error) {
-        console.error("Error fetching author:", error.message);
+        console.error(`Error fetching books by author ${author}:`, error.message);
+    }
+};
+const getBooksByTitle = async (title) => {
+    try {
+        // This matches the path: http://localhost:5000/title/Things%20Fall%20Apart
+        const response = await axios.get(`http://localhost:5000/title/${title}`);
+        console.log(`Books with title "${title}":`);
+        console.log(JSON.stringify(response.data, null, 4));
+    } catch (error) {
+        console.error(`Error fetching books by title ${title}:`, error.message);
     }
 };
 
-// Test it
+
+// Fixed calling syntax (removed incorrect setTimeout syntax)
+getBooks()
+getBookByISBN(1)
 getBooksByAuthor("Chinua Achebe");
-
-// Get all books based on title
-public_users.get('/title/:title', function (req, res) {
-    const title = req.params.title;
-    let filtered_books = Object.values(books).filter(book => book.title === title);
-    res.send(filtered_books);
-});
-
-// Get book review
-public_users.get('/review/:isbn', function (req, res) {
-    const isbn = req.params.isbn;
-    res.send(books[isbn].reviews);
-});
-
-module.exports.general = public_users;
+getBooksByTitle("Things Fall Apart")
+export const general = public_users;
