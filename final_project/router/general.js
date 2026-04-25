@@ -55,34 +55,37 @@ public_users.get("/isbn/:isbn", async (req, res) => {
         res.status(404).json({ message: "Book not found" });
     }
 });
-public_users.get("/author/:author", async (req, res) => {
-    const author = req.params.author;
+public_users.get('/author/:author', async (req, res) => {
+  const author = req.params.author.toLowerCase();
+  try {
+    const allBooks = Object.values(books);
+    // Edge Case: Handling case-insensitivity and multiple books by same author
+    const filteredBooks = allBooks.filter(b => b.author.toLowerCase() === author);
 
-    // Loading check
-    if (!books || Object.keys(books).length === 0) {
-        return res.status(503).json({ message: "Database loading..." });
-    }
-
-    // Filter books by the author name provided in the URL
-    const filtered_books = Object.values(books).filter(book => book.author === author);
-
-    if (filtered_books.length > 0) {
-        res.status(200).json(filtered_books);
+    if (filteredBooks.length > 0) {
+      return res.status(200).json(filteredBooks);
     } else {
-        res.status(404).json({ message: "No books found by this author" });
+      return res.status(404).json({ message: "No books found for this author" });
     }
+  } catch (error) {
+    return res.status(500).json({ message: "Error retrieving books by author" });
+  }
 });
 
-public_users.get("/title/:title", async (req, res) => {
-    const title = req.params.title;
+public_users.get('/title/:title', async (req, res) => {
+  const title = req.params.title.toLowerCase();
+  try {
+    const allBooks = Object.values(books);
+    const filteredBooks = allBooks.filter(b => b.title.toLowerCase().includes(title));
 
-    const filtered_books = Object.values(books).filter(b => b.title === title);
-
-    if (filtered_books.length > 0) {
-        res.status(200).json(filtered_books);
+    if (filteredBooks.length > 0) {
+      return res.status(200).json(filteredBooks);
     } else {
-        res.status(404).json({ message: "No books found with this title" });
+      return res.status(404).json({ message: "Book title not found" });
     }
+  } catch (error) {
+    return res.status(500).json({ message: "Error retrieving book by title" });
+  }
 });
 
 const getBooks = async () => {
