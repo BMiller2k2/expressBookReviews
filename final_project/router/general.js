@@ -9,7 +9,7 @@ public_users.post("/register", (req, res) => {
     const { username, password } = req.body;
 
     if (username && password) {
-        if (isValid(username)) {
+        if (!isValid(username)) {
             users.push({ "username": username, "password": password });
             return res.status(200).json({ message: "User successfully registered. Now you can login" });
         } else {
@@ -20,22 +20,43 @@ public_users.post("/register", (req, res) => {
 });
 
 // Get the book list available in the shop
-public_users.get('/', function (req, res) {
-    res.send(JSON.stringify(books, null, 4));
-});
+const axios = require('axios');
 
-// Get book details based on ISBN
-public_users.get('/isbn/:isbn', function (req, res) {
-    const isbn = req.params.isbn;
-    res.send(books[isbn]);
-});
+const getBooks = async () => {
+    try {
+        const response = await axios.get("http://localhost:5000/");
+        console.log(JSON.stringify(response.data, null, 4));
+    } catch (error) {
+        console.error("Error fetching books:", error.message);
+    }
+};
+getBooks();
 
-// Get book details based on author
-public_users.get('/author/:author', function (req, res) {
-    const author = req.params.author;
-    let filtered_books = Object.values(books).filter(book => book.author === author);
-    res.send(filtered_books);
-});
+const getBookByISBN = async (isbn) => {
+    try {
+        const response = await axios.get(`http://localhost:5000/isbn/${isbn}`);
+        console.log("Book details by ISBN:");
+        console.log(JSON.stringify(response.data, null, 4));
+    } catch (error) {
+        console.error("Error fetching ISBN:", error.message);
+    }
+};
+
+// Test it
+getBookByISBN(1)
+
+const getBooksByAuthor = async (author) => {
+    try {
+        const response = await axios.get(`http://localhost:5000/author/${author}`);
+        console.log(`Books by ${author}:`);
+        console.log(JSON.stringify(response.data, null, 4));
+    } catch (error) {
+        console.error("Error fetching author:", error.message);
+    }
+};
+
+// Test it
+getBooksByAuthor("Chinua Achebe");
 
 // Get all books based on title
 public_users.get('/title/:title', function (req, res) {
